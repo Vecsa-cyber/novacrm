@@ -34,9 +34,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
       // Recibimos la respuesta
       const data = await response.json();
+      console.log('🔍 Respuesta API:', data);
 
       if (data.success) {
-        // Si el login fue exitoso, pasamos los datos del usuario a la App
+        console.log('✅ Usuario recibido:', data.userData);
         onLoginSuccess(data.userData);
       } else {
         // Si falló (contraseña incorrecta), mostramos el mensaje que nos mande Sheets

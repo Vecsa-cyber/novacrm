@@ -2,10 +2,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Users, Search, Plus, Edit2, Trash2, ChevronDown, Check, X } from 'lucide-react';
 
 const contactsListMock = [
-  { id: 1, init: 'LM', color: 'bg-purple-100 text-purple-700', name: 'Laura Méndez',   company: 'Grupo Alfa',         email: 'laura@alfa.mx',        phone: '81-2200-0011', status: 'Cliente',    statusColor: 'bg-nova-emerald/20 text-nova-emerald', value: '$48,000' },
-  { id: 2, init: 'CR', color: 'bg-blue-100 text-blue-700',     name: 'Carlos Rivera',  company: 'TechNova SA',        email: 'crivera@technova.com', phone: '55-3100-4422', status: 'Prospecto',  statusColor: 'bg-blue-100 text-blue-700',            value: '$22,000' },
-  { id: 3, init: 'AG', color: 'bg-green-100 text-green-700',   name: 'Ana Gutiérrez',  company: 'Inversiones MX',     email: 'ana.g@invmx.com',      phone: '33-4400-9900', status: 'Interesado', statusColor: 'bg-amber-100 text-amber-700',           value: '$75,000' },
-  { id: 4, init: 'DT', color: 'bg-amber-100 text-amber-700',   name: 'Diego Torres',   company: 'Constructora Reyes', email: 'dtorres@reyes.mx',     phone: '81-9900-1122', status: 'Inactivo',   statusColor: 'bg-gray-100 text-gray-500',             value: '$31,000' },
+  { id: 1, init: 'LM', color: 'bg-purple-100 text-purple-700', name: 'Laura Méndez',   company: 'Grupo Alfa',         email: 'laura@alfa.mx',        phone: '2200-0011', status: 'Cliente',    statusColor: 'bg-nova-emerald/20 text-nova-emerald', value: '$48,000' },
+  { id: 2, init: 'CR', color: 'bg-blue-100 text-blue-700',     name: 'Carlos Rivera',  company: 'TechNova SA',        email: 'crivera@technova.com', phone: '3100-4422', status: 'Prospecto',  statusColor: 'bg-blue-100 text-blue-700',            value: '$22,000' },
+  { id: 3, init: 'AG', color: 'bg-green-100 text-green-700',   name: 'Ana Gutiérrez',  company: 'Inversiones MX',     email: 'ana.g@invmx.com',      phone: '4400-9900', status: 'Interesado', statusColor: 'bg-amber-100 text-amber-700',           value: '$75,000' },
+  { id: 4, init: 'DT', color: 'bg-amber-100 text-amber-700',   name: 'Diego Torres',   company: 'Constructora Reyes', email: 'dtorres@reyes.mx',     phone: '9900-1122', status: 'Inactivo',   statusColor: 'bg-gray-100 text-gray-500',             value: '$31,000' },
 ];
 
 const STATUS_OPTIONS = ['Todos', 'Cliente', 'Prospecto', 'Interesado', 'Inactivo'];
