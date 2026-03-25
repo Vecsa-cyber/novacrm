@@ -4,6 +4,7 @@ import { DashboardDetailsView } from './assets/features/Dashboard/View/Dashboard
 import { ContactsListView } from './assets/features/Contacts/Views/ContactsListView';
 import { LoginView } from './assets/features/Auth/Views/LoginView'; 
 import { PipelineView } from './assets/features/Pipieline/Views/PipelineView';
+import { ActivitiesView } from './assets/features/Activities/Views/ActivitiesView';
 
 function App() {
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -44,6 +45,11 @@ function App() {
         {/* VISTA DE PIPELINE */}
         {currentView === 'pipeline' && currentUser?.modulosPermitidos?.includes('pipeline') && (
           <PipelineView currentUser={currentUser} />
+        )}
+
+        {/* VISTA DE ACTIVIDADES */}
+        {currentView === 'activities' && currentUser?.modulosPermitidos?.includes('activities') && (
+          <ActivitiesView currentUser={currentUser} />
         )}
 
         {/* Ejemplo de cómo quedaría Settings (Solo para Admin / Rol 1) */}
