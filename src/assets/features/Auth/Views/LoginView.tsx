@@ -1,125 +1,116 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Mail, Lock, Loader2, Eye, EyeOff } from 'lucide-react';
-
-interface LoginViewProps {
-  onLoginSuccess: (userData: any) => void;
-}
-
-// ⚠️ Reemplaza esta URL con la que te dé Google Apps Script al implementarlo
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxswNEhkJp8ozyWyIYJ2U7jxcvrNd-pfCd5vMWtNzfYqgqSjrbevLlUCjgWw38etq_-/exec';
+import { useLogin } from '../hooks/useLogin';
+import type { LoginViewProps } from '../types/auth.d';
+import loginBg from '../../../login-bg.png';
 
 export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError('');
-
-    try {
-      // Enviamos el correo y contraseña a tu Google Apps Script
-      const response = await fetch(SCRIPT_URL, {
-        method: 'POST',
-        headers: {
-          // Usamos text/plain para evitar errores de CORS con Google
-          'Content-Type': 'text/plain;charset=utf-8', 
-        },
-        body: JSON.stringify({ email, password }),
-        redirect: 'follow'
-      });
-
-      // Recibimos la respuesta
-      const data = await response.json();
-      console.log('🔍 Respuesta API:', data);
-
-      if (data.success) {
-        console.log('✅ Usuario recibido:', data.userData);
-        onLoginSuccess(data.userData);
-      } else {
-        // Si falló (contraseña incorrecta), mostramos el mensaje que nos mande Sheets
-        setError(data.message || 'Correo o contraseña incorrectos.');
-      }
-    } catch (err) {
-      console.error(err);
-      setError('Error al conectar con el servidor.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const {
+    email, setEmail,
+    password, setPassword,
+    isLoading, error,
+    showPassword, setShowPassword,
+    handleLogin,
+  } = useLogin(onLoginSuccess);
 
   return (
-    <div className="min-h-screen w-full bg-nova-bg flex items-center justify-center p-4">
-      {/* ... (Todo tu código visual del formulario se queda EXACTAMENTE IGUAL) ... */}
-      <div className="bg-white w-full max-w-md rounded-[2rem] p-8 fade-in border border-blue-100" style={{ boxShadow: '0 0 40px 8px rgba(59,130,246,0.12), 0 10px 40px -10px rgba(0,0,0,0.08)' }}>
-        
-        {/* Logo */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 bg-nova-blue rounded-2xl flex items-center justify-center shadow-lg shadow-nova-blue/30 mb-4">
-            <span className="text-white font-black text-3xl">N</span>
+    <div className="relative min-h-screen w-full overflow-hidden">
+
+      {/* ── Fondo — imagen a pantalla completa ── */}
+      <img
+        src={loginBg}
+        alt="NovaCRM background"
+        className="absolute inset-0 w-full h-full object-cover"
+      />
+      {/* Overlay suave para no tapar la imagen */}
+      <div className="absolute inset-0 bg-black/20" />
+
+      {/* ── Card de login — centrado en móvil, derecha en desktop ── */}
+      <div className="relative z-10 min-h-screen flex items-center justify-center px-4 md:justify-end md:px-0 md:pr-14 lg:pr-20">
+        <div className="w-full max-w-sm bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl p-6 sm:p-8 my-6 sm:my-8">
+
+          {/* Logo */}
+          <div className="flex flex-col items-center mb-7">
+            <div className="w-14 h-14 bg-blue-500 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30 mb-3">
+              <span className="text-white font-black text-2xl">H</span>
+            </div>
+            <h1 className="text-2xl font-black tracking-tight text-gray-800">
+              Hydro<span className="text-blue-500">CRM</span>
+            </h1>
+            <p className="text-slate-400 text-sm mt-1 font-medium">Bienvenido de vuelta</p>
           </div>
-          <h1 className="text-2xl font-black tracking-tight text-gray-800">
-            Nova<span className="text-nova-blue">CRM</span>
-          </h1>
-          <p className="text-nova-slate text-sm mt-2 font-medium">Ingresa a tu panel de control</p>
+
+          <form onSubmit={handleLogin} className="flex flex-col gap-4">
+
+            {/* Email */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+                Correo Electrónico
+              </label>
+              <div className="relative flex items-center">
+                <Mail className="absolute left-4 text-gray-400" size={17} />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="usuario@empresa.com"
+                  className="w-full bg-gray-50 border border-gray-200 pl-11 pr-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all text-sm text-gray-800 font-medium"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Contraseña */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+                Contraseña
+              </label>
+              <div className="relative flex items-center">
+                <Lock className="absolute left-4 text-gray-400" size={17} />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full bg-gray-50 border border-gray-200 pl-11 pr-11 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all text-sm text-gray-800 font-medium"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(v => !v)}
+                  className="absolute right-4 text-gray-400 hover:text-blue-500 transition-colors"
+                >
+                  {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Error */}
+            {error && (
+              <p className="text-red-500 text-sm font-bold text-center bg-red-50 border border-red-100 p-3 rounded-xl fade-in">
+                {error}
+              </p>
+            )}
+
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-xl font-bold mt-1 shadow-sm hover:-translate-y-0.5 hover:shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:hover:translate-y-0 disabled:cursor-not-allowed"
+            >
+              {isLoading
+                ? <><Loader2 className="animate-spin" size={18} /> Verificando...</>
+                : 'Iniciar Sesión'
+              }
+            </button>
+
+          </form>
+
+          <p className="text-center text-xs text-gray-300 font-medium mt-6">
+            © {new Date().getFullYear()} HydroCRM
+          </p>
+
         </div>
-
-        <form onSubmit={handleLogin} className="flex flex-col gap-5">
-          {/* Input Email */}
-          <div>
-            <label className="text-sm font-bold text-nova-slate mb-1.5 block">Correo Electrónico</label>
-            <div className="relative flex items-center">
-              <Mail className="absolute left-4 text-gray-400" size={18} />
-              <input 
-                type="email" 
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="ejemplo@novacrm.com" 
-                className="w-full bg-nova-bg/50 border border-gray-100 pl-11 pr-4 py-3.5 rounded-2xl focus:outline-none focus:ring-2 focus:ring-nova-blue/20 focus:border-nova-blue transition-all text-sm text-gray-800 font-medium" 
-                required
-              />
-            </div>
-          </div>
-
-          {/* Input Contraseña */}
-          <div>
-            <label className="text-sm font-bold text-nova-slate mb-1.5 block">Contraseña</label>
-            <div className="relative flex items-center">
-              <Lock className="absolute left-4 text-gray-400" size={18} />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full bg-nova-bg/50 border border-gray-100 pl-11 pr-11 py-3.5 rounded-2xl focus:outline-none focus:ring-2 focus:ring-nova-blue/20 focus:border-nova-blue transition-all text-sm text-gray-800 font-medium"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(v => !v)}
-                className="absolute right-4 text-gray-400 hover:text-nova-blue transition-colors"
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-          </div>
-
-          {/* Mensaje de Error */}
-          {error && <p className="text-red-500 text-sm font-bold text-center bg-red-50 p-3 rounded-xl fade-in">{error}</p>}
-
-          {/* Botón Submit */}
-          <button 
-            type="submit" 
-            disabled={isLoading}
-            className="w-full bg-blue-500 text-white py-3.5 rounded-xl font-bold mt-2 shadow-soft hover:-translate-y-0.5 hover:shadow-lg transition-all flex items-center justify-center disabled:opacity-70 disabled:hover:translate-y-0"
-          >
-            {isLoading ? <Loader2 className="animate-spin" size={20} /> : 'Iniciar Sesión'}
-          </button>
-        </form>
-
       </div>
     </div>
   );

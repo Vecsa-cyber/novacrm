@@ -1,22 +1,21 @@
 import React from 'react';
 
-// Tipado estricto para las propiedades del contenedor
 interface InfoCardProps {
   title?: string;
-  icon?: React.ElementType; // Usamos React.ElementType para evitar conflictos de Lucide
-  accentColor?: 'blue' | 'emerald' | 'slate' | 'amber' | 'purple'; // Borde superior opcional
-  children: React.ReactNode; // El contenido específico de la tarjeta irá aquí
-  className?: string; // Para sobrescribir estilos si es necesario
-  footer?: React.ReactNode; // Sección de pie de página opcional
+  icon?: React.ElementType;
+  accentColor?: 'blue' | 'emerald' | 'slate' | 'amber' | 'purple';
+  children: React.ReactNode;
+  className?: string;
+  footer?: React.ReactNode;
+  darkMode?: boolean;
 }
 
-// Mapa de colores para el borde superior
 const accentBorderMap: Record<string, string> = {
-  blue: 'border-t-4 border-nova-blue',
+  blue:    'border-t-4 border-nova-blue',
   emerald: 'border-t-4 border-nova-emerald',
-  slate: 'border-t-4 border-nova-slate',
-  amber: 'border-t-4 border-amber-400', 
-  purple: 'border-t-4 border-purple-400',
+  slate:   'border-t-4 border-nova-slate',
+  amber:   'border-t-4 border-amber-400',
+  purple:  'border-t-4 border-purple-400',
 };
 
 export const InfoCard: React.FC<InfoCardProps> = ({
@@ -26,33 +25,37 @@ export const InfoCard: React.FC<InfoCardProps> = ({
   children,
   className = '',
   footer,
+  darkMode = false,
 }) => {
+  const cardBg      = darkMode ? 'bg-gray-800'  : 'bg-white';
+  const iconBg      = darkMode ? 'bg-gray-700'  : 'bg-nova-bg';
+  const iconText    = darkMode ? 'text-gray-400' : 'text-nova-slate';
+  const titleText   = darkMode ? 'text-white'   : 'text-gray-800';
+  const footerBorder = darkMode ? 'border-gray-700' : 'border-gray-100';
+
   return (
     <div
-      className={`bg-white rounded-nova shadow-soft p-6 md:p-8 flex flex-col ${
+      className={`${cardBg} rounded-nova shadow-soft p-6 md:p-8 flex flex-col ${
         accentColor ? accentBorderMap[accentColor] : ''
       } ${className}`}
     >
-      {/* Cabecera opcional de la tarjeta */}
       {(title || Icon) && (
         <div className="flex items-center gap-3 mb-6">
           {Icon && (
-            <div className="w-10 h-10 bg-nova-bg rounded-xl flex items-center justify-center text-nova-slate">
+            <div className={`w-10 h-10 ${iconBg} rounded-xl flex items-center justify-center ${iconText}`}>
               <Icon size={20} strokeWidth={2} />
             </div>
           )}
-          {title && <h3 className="text-xl font-bold text-gray-800 tracking-tight">{title}</h3>}
+          {title && <h3 className={`text-xl font-bold tracking-tight ${titleText}`}>{title}</h3>}
         </div>
       )}
 
-      {/* Contenido principal (Children) */}
       <div className="flex-1 text-nova-slate text-sm">
         {children}
       </div>
 
-      {/* Pie de página opcional */}
       {footer && (
-        <div className="border-t border-gray-100 pt-6 mt-6">
+        <div className={`border-t ${footerBorder} pt-6 mt-6`}>
           {footer}
         </div>
       )}

@@ -1,144 +1,238 @@
-import React from 'react';
-import { FileText, Users, Briefcase, Calendar, Phone, Mail, ChevronRight, MessageSquare, Plus, DollarSign, Activity } from 'lucide-react';
-import { StatCard } from '../../Dashboard/components/StatCard'; // Importación de tu componente existente (corregido con React.ElementType)
-import { InfoCard } from '../../../components/UI/InfoCard'; // Tu nuevo contenedor genérico
+import React, { useState, useEffect } from 'react';
+import { FileText, Users, Briefcase, Calendar, Phone, Mail, ChevronRight, MessageSquare, Activity, Clock } from 'lucide-react';
+import { apiFetch } from '../../../../lib/apiFetch';
+import { StatCard } from '../../Dashboard/components/StatCard';
+import { InfoCard } from '../../../components/UI/InfoCard';
 
-// Mock data y tipos
-type Trato = {
-  id: number;
-  trato: string;
+interface ActividadDB {
+  id_actividad: number;
+  tipo_actividad: string;
+  fecha_actividad: string;
+  usuario: string;
   empresa: string;
-  vendedor: string;
-  etapa: 'Pérdida' | 'En Cotización' | 'Trato Avanzado' | 'Forecast';
+}
+
+const activityIconMap: Record<string, { icon: React.ElementType; bg: string; text: string }> = {
+  'visita':      { icon: Calendar,      bg: 'bg-amber-100',   text: 'text-amber-700'   },
+  'llamada':     { icon: Phone,         bg: 'bg-blue-100',    text: 'text-blue-600'    },
+  'reunión':     { icon: Users,         bg: 'bg-purple-100',  text: 'text-purple-700'  },
+  'reunion':     { icon: Users,         bg: 'bg-purple-100',  text: 'text-purple-700'  },
+  'email':       { icon: Mail,          bg: 'bg-pink-100',    text: 'text-pink-700'    },
+  'seguimiento': { icon: MessageSquare, bg: 'bg-emerald-100', text: 'text-emerald-700' },
+};
+const defaultIcon = { icon: Activity, bg: 'bg-gray-100', text: 'text-gray-500' };
+
+const formatHora = (fechaStr: string): string => {
+  if (!fechaStr) return '—';
+  const fecha = new Date(fechaStr);
+  const ahora = new Date();
+  const diffMs = ahora.getTime() - fecha.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1)  return 'Ahora';
+  if (diffMin < 60) return `Hace ${diffMin} min`;
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24)   return `Hace ${diffH}h`;
+  const diffD = Math.floor(diffH / 24);
+  if (diffD === 1)  return 'Ayer';
+  return fecha.toLocaleDateString('es-MX', { day: '2-digit', month: 'short' });
 };
 
-type Actividad = {
-  id: number;
-  actividad: string;
-  detalles: string;
-  hora: string;
-  iconType: 'reunion' | 'llamada' | 'email' | 'mensaje';
+const stageColorMap: Record<string, string> = {
+  'En Negociación': 'bg-blue-100 text-blue-700',
+  'Pendiente':      'bg-amber-100 text-amber-700',
+  'Cerrado':        'bg-emerald-100 text-emerald-700',
+  'Pérdida':        'bg-red-100 text-red-600',
 };
 
-const tratosRecientesMock: Trato[] = [
-  { id: 1, trato: 'Póliza Osmosis', empresa: 'Lear Arteaga', vendedor: 'Eduardo', etapa: 'Pérdida' },
-  { id: 2, trato: 'Póliza PTAR', empresa: 'Deacero Fino', vendedor: 'Eduardo', etapa: 'Pérdida' },
-  { id: 3, trato: 'Póliza Osmosis y Chillers', empresa: 'Turck Arteaga', vendedor: 'Eduardo', etapa: 'Pérdida' },
-];
+interface Resumen {
+  visitas: number;
+  oportunidades: number;
+  avanzados: number;
+  en_negociacion: number;
+}
 
-const ultimasActividadesMock: Actividad[] = [
-  { id: 1, actividad: 'Reunión con Diego Torres', detalles: 'Presentación de soluciones', hora: 'Hoy 11:00', iconType: 'reunion' },
-  { id: 2, actividad: 'Llamada con Laura Méndez', detalles: 'Seguimiento propuesta Q2', hora: 'Hace 30 min', iconType: 'llamada' },
-  { id: 3, actividad: 'Email a Carlos Ruiz', detalles: 'Confirmación de presupuesto', hora: 'Hace 2 horas', iconType: 'email' },
-  { id: 4, actividad: 'Mensaje de WhatsApp de Ana S.', detalles: 'Duda sobre la póliza', hora: 'Hoy 09:30', iconType: 'mensaje' },
-];
+interface Usuario { id_usuario: number; nombre: string; }
 
-// Mapa de íconos y colores para las actividades
-const activityIconMap = {
-  reunion: { icon: Calendar, bg: 'bg-amber-100', text: 'text-amber-700' },
-  llamada: { icon: Phone, bg: 'bg-nova-blue/10', text: 'text-nova-blue' },
-  email: { icon: Mail, bg: 'bg-purple-100', text: 'text-purple-700' },
-  mensaje: { icon: MessageSquare, bg: 'bg-nova-emerald/10', text: 'text-nova-emerald' },
-};
+interface DashboardProps {
+  onNavigate: (module: string, id?: number) => void;
+  darkMode?: boolean;
+}
 
-// Mapa de colores para las etapas del trato
-const stageColorMap = {
-  'Pérdida': 'bg-red-100 text-red-600',
-  'En Cotización': 'bg-purple-100 text-purple-700',
-  'Trato Avanzado': 'bg-nova-blue/10 text-nova-blue',
-  'Forecast': 'bg-nova-emerald/10 text-nova-emerald',
-};
+export const DashboardDetailsView: React.FC<DashboardProps> = ({ onNavigate, darkMode = false }) => {
+  const [resumen, setResumen]             = useState<Resumen>({ visitas: 0, oportunidades: 0, avanzados: 0, en_negociacion: 0 });
+  const [usuarios, setUsuarios]           = useState<Usuario[]>([]);
+  const [filtroUsuario, setFiltroUsuario] = useState<string>('');
+  const [filtroDesde, setFiltroDesde]     = useState<string>('');
+  const [filtroHasta, setFiltroHasta]     = useState<string>('');
+  const [ahora, setAhora]                 = useState(new Date());
+  const [tratosRecientes, setTratosRecientes]       = useState<any[]>([]);
+  const [ultimasActividades, setUltimasActividades] = useState<ActividadDB[]>([]);
 
-export const DashboardDetailsView: React.FC = () => {
+  // helpers de color basados en darkMode
+  const d = (light: string, dark: string) => darkMode ? dark : light;
+
+  useEffect(() => {
+    const timer = setInterval(() => setAhora(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    apiFetch('/api/usuarios')
+      .then(res => res.json())
+      .then(data => setUsuarios(data))
+      .catch(err => console.error('Error al cargar usuarios:', err));
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (filtroUsuario) params.set('id_usuario', filtroUsuario);
+    if (filtroDesde)   params.set('fecha_desde', filtroDesde);
+    if (filtroHasta)   params.set('fecha_hasta', filtroHasta);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+
+    apiFetch(`/api/dashboard/resumen${qs}`)
+      .then(res => res.json())
+      .then(data => setResumen(data))
+      .catch(err => console.error('Error al cargar resumen:', err));
+
+    apiFetch(`/api/dashboard/tratos-recientes${qs}`)
+      .then(res => res.json())
+      .then(data => setTratosRecientes(data))
+      .catch(err => console.error('Error al cargar tratos:', err));
+
+    apiFetch(`/api/dashboard/actividades-recientes${qs}`)
+      .then(res => res.json())
+      .then(data => setUltimasActividades(data))
+      .catch(err => console.error('Error al cargar actividades:', err));
+  }, [filtroUsuario, filtroDesde, filtroHasta]);
+
   return (
-    <div className="p-8 w-full flex flex-col gap-8 flex-1">
-      
-      {/* 1. Header del Dashboard (como en imagen_3.png) */}
-      <div className="flex justify-between items-center mb-4">
+    <div className="p-4 md:p-8 w-full flex flex-col gap-6 md:gap-8 flex-1">
+
+      {/* 1. Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-0 md:mb-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-800">Dashboard</h1>
-          <p className="text-slate-500 mt-1">martes, 24 de marzo de 2026</p>
+          <h1 className={`text-2xl md:text-3xl font-extrabold ${d('text-slate-800', 'text-white')}`}>Dashboard</h1>
+          <p className={`mt-1 capitalize text-sm md:text-base ${d('text-slate-500', 'text-gray-400')}`}>
+            {ahora.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+          </p>
         </div>
-        {/* Avatar del usuario (como en imagen_2.png) */}
-        <div className="w-12 h-12 rounded-full bg-pink-200 border-2 border-white shadow-sm overflow-hidden flex items-center justify-center">
-          <span className="text-pink-600 font-bold text-lg">E</span>
-        </div>
-      </div>
-
-      {/* 2. Barra de Filtros (Estilo CraftUI con borde sutil y fondo blanco) */}
-      <div className="bg-white rounded-nova shadow-soft p-5 flex items-center gap-6 border border-gray-100">
-        <button className="flex items-center gap-2 text-nova-blue font-medium bg-nova-bg px-4 py-2 rounded-xl text-sm">
-          <FileText size={18} />
-          <span className="font-semibold text-gray-400">FILTROS</span>
-          <span>Vendedor:</span>
-          <span className="text-gray-900 font-semibold">Todos</span>
-        </button>
-        {/* Mock de selectores de fecha */}
-        <div className="text-sm font-medium text-gray-400 flex items-center gap-2">
-          <span>Desde</span>
-          <span className="text-gray-900 bg-nova-bg px-3 py-1.5 rounded-lg">mm/dd/yyyy</span>
-          <span>Hasta</span>
-          <span className="text-gray-900 bg-nova-bg px-3 py-1.5 rounded-lg">mm/dd/yyyy</span>
+        <div className={`flex items-center gap-2 border shadow-soft px-4 py-2.5 rounded-2xl font-bold text-base md:text-lg tabular-nums self-start sm:self-auto ${d('bg-white border-gray-100 text-slate-700', 'bg-gray-800 border-gray-700 text-gray-200')}`}>
+          <Clock size={18} className="text-nova-blue flex-shrink-0" />
+          {ahora.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
         </div>
       </div>
 
-      {/* 3. Grid de Stat Cards (Usando tu componente existente) */}
+      {/* 2. Filtros */}
+      <div className={`rounded-nova shadow-soft p-4 md:p-5 flex flex-col gap-3 border ${d('bg-white border-gray-100', 'bg-gray-800 border-gray-700')}`}>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm min-w-0 ${d('bg-nova-bg', 'bg-gray-700')}`}>
+            <FileText size={18} className="flex-shrink-0 text-nova-blue" />
+            <span className="font-semibold text-gray-400 whitespace-nowrap">Vendedor:</span>
+            <select
+              value={filtroUsuario}
+              onChange={e => setFiltroUsuario(e.target.value)}
+              className={`bg-transparent font-semibold outline-none cursor-pointer min-w-0 max-w-[140px] ${d('text-gray-900', 'text-gray-100')}`}
+            >
+              <option value="">Todos</option>
+              {usuarios.map(u => (
+                <option key={u.id_usuario} value={u.id_usuario}>{u.nombre}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-sm font-medium text-gray-400">
+            <span className="whitespace-nowrap">Desde</span>
+            <input
+              type="date"
+              value={filtroDesde}
+              onChange={e => setFiltroDesde(e.target.value)}
+              className={`px-3 py-1.5 rounded-lg outline-none focus:ring-2 ring-blue-200 cursor-pointer w-[140px] min-w-0 ${d('text-gray-900 bg-nova-bg', 'text-gray-100 bg-gray-700')}`}
+            />
+            <span className="whitespace-nowrap">Hasta</span>
+            <input
+              type="date"
+              value={filtroHasta}
+              min={filtroDesde || undefined}
+              onChange={e => setFiltroHasta(e.target.value)}
+              className={`px-3 py-1.5 rounded-lg outline-none focus:ring-2 ring-blue-200 cursor-pointer w-[140px] min-w-0 ${d('text-gray-900 bg-nova-bg', 'text-gray-100 bg-gray-700')}`}
+            />
+            {(filtroDesde || filtroHasta) && (
+              <button
+                onClick={() => { setFiltroDesde(''); setFiltroHasta(''); }}
+                className={`text-xs font-bold text-red-400 hover:text-red-500 px-2 py-1.5 rounded-lg transition-colors whitespace-nowrap ${d('hover:bg-red-50', 'hover:bg-red-900/20')}`}
+              >
+                Limpiar
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="VISITAS REALIZADAS" value="1" trend={100} Icon={Calendar} colorAccent="blue" />
-        <StatCard title="OPORTUNIDADES" value="68" trend={-5} Icon={Briefcase} colorAccent="emerald" />
-        <StatCard title="TRATOS AVANZADOS" value="0" trend={0} Icon={Activity} colorAccent="amber" />
-        <StatCard title="EN COTIZACIÓN" value="31" trend={12} Icon={DollarSign} colorAccent="purple" />
+        <StatCard title="VISITAS REALIZADAS" value={String(resumen.visitas)}       trend={0} Icon={Calendar} colorAccent="blue"    darkMode={darkMode} />
+        <StatCard title="OPORTUNIDADES"       value={String(resumen.oportunidades)} trend={0} Icon={Users}    colorAccent="emerald" darkMode={darkMode} />
+        <StatCard title="TRATOS AVANZADOS"    value={String(resumen.avanzados)}     trend={0} Icon={Briefcase} colorAccent="amber"  darkMode={darkMode} />
+        <StatCard title="EN COTIZACIÓN"       value={String(resumen.en_negociacion)} trend={0} Icon={Activity} colorAccent="purple" darkMode={darkMode} />
       </div>
 
-      {/* 4. Grid de Data Cards (Usando el nuevo contenedor InfoCard genérico) */}
+      {/* 4. Info Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 flex-1">
-        
-        {/* Ejemplo A: Tarjeta "Tratos Recientes" (Lista limpia) */}
-        <InfoCard title="TRATOS RECIENTES" icon={Briefcase} accentColor="emerald">
+
+        <InfoCard title="TRATOS RECIENTES" icon={Briefcase} accentColor="emerald" darkMode={darkMode}>
           <div className="space-y-4">
-            {/* Cabecera de la lista (ocultar en móvil para limpiar la interfaz) */}
-            <div className="hidden sm:grid sm:grid-cols-4 text-xs font-semibold text-gray-400 pb-2 border-b border-gray-100">
-              <span>TRATO</span>
-              <span>EMPRESA</span>
-              <span>VENDEDOR</span>
-              <span className="text-center">ETAPA</span>
+            <div className={`hidden sm:grid sm:grid-cols-4 text-xs font-semibold text-gray-400 pb-2 border-b ${d('border-gray-100', 'border-gray-700')}`}>
+              <span>TRATO</span><span>EMPRESA</span><span>VENDEDOR</span><span className="text-center">ESTADO</span>
             </div>
-            {/* Filas de datos (estilo lista, no tabla tradicional) */}
-            {tratosRecientesMock.map((trato) => (
-              <div key={trato.id} className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 text-sm text-gray-900 font-medium py-1">
-                <span className="truncate">{trato.trato}</span>
-                <span className="truncate text-nova-slate sm:text-gray-900">{trato.empresa}</span>
-                <span>{trato.vendedor}</span>
-                <span className="flex justify-center">
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${stageColorMap[trato.etapa]}`}>{trato.etapa}</span>
+            {tratosRecientes.length === 0 ? (
+              <p className="text-center text-gray-400 text-sm py-4">Sin tratos registrados</p>
+            ) : tratosRecientes.map((trato) => (
+              <div
+                key={trato.id_trato}
+                onClick={() => onNavigate('pipeline', trato.id_trato)}
+                className={`grid grid-cols-1 sm:grid-cols-4 items-center gap-2 text-sm font-medium py-1 px-2 -mx-2 rounded-xl cursor-pointer transition-colors ${d('text-gray-900 hover:bg-emerald-50', 'text-gray-200 hover:bg-emerald-900/20')}`}
+              >
+                <span className="truncate">{trato.nombre_servicio}</span>
+                <span className={`truncate ${d('text-nova-slate', 'text-gray-400')}`}>{trato.empresa}</span>
+                <span className={d('text-nova-slate', 'text-gray-400')}>{trato.vendedor ?? '—'}</span>
+                <span className="flex sm:justify-center">
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${stageColorMap[trato.estado] ?? 'bg-gray-100 text-gray-500'}`}>
+                    {trato.estado}
+                  </span>
                 </span>
               </div>
             ))}
           </div>
         </InfoCard>
 
-        {/* Ejemplo B: Tarjeta "Últimas Actividades" (Feed de Actividad) */}
-        <InfoCard title="ÚLTIMAS ACTIVIDADES" icon={Calendar} accentColor="purple">
+        <InfoCard title="ÚLTIMAS ACTIVIDADES" icon={Calendar} accentColor="purple" darkMode={darkMode}>
           <div className="space-y-6">
-            {ultimasActividadesMock.map((actividad) => {
-              const IconData = activityIconMap[actividad.iconType];
+            {ultimasActividades.length === 0 ? (
+              <p className="text-center text-gray-400 text-sm py-4">Sin actividades registradas</p>
+            ) : ultimasActividades.map((actividad) => {
+              const key = (actividad.tipo_actividad ?? '').toLowerCase();
+              const IconData = activityIconMap[key] ?? defaultIcon;
+              const Icon = IconData.icon;
               return (
-                <div key={actividad.id} className="flex items-center gap-4">
-                  {/* Ícono de actividad */}
+                <div
+                  key={actividad.id_actividad}
+                  onClick={() => onNavigate('activities', actividad.id_actividad)}
+                  className={`flex items-center gap-4 px-2 -mx-2 rounded-xl cursor-pointer transition-colors ${d('hover:bg-purple-50', 'hover:bg-purple-900/20')}`}
+                >
                   <div className={`w-12 h-12 ${IconData.bg} rounded-2xl flex items-center justify-center flex-shrink-0`}>
-                    <IconData.icon size={22} className={IconData.text} />
+                    <Icon size={22} className={IconData.text} />
                   </div>
-                  {/* Texto de actividad */}
                   <div className="flex-1 overflow-hidden">
-                    <p className="font-bold text-gray-900 text-sm truncate">{actividad.actividad}</p>
-                    <p className="text-nova-slate text-xs truncate">{actividad.detalles}</p>
+                    <p className={`font-bold text-sm truncate ${d('text-gray-900', 'text-gray-100')}`}>
+                      {actividad.tipo_actividad ?? 'Actividad'}
+                    </p>
+                    <p className={`text-xs truncate ${d('text-nova-slate', 'text-gray-400')}`}>
+                      {[actividad.usuario, actividad.empresa].filter(Boolean).join(' · ')}
+                    </p>
                   </div>
-                  {/* Tiempo y botón de acción */}
-                  <div className="flex items-center gap-2 text-nova-slate text-xs flex-shrink-0">
-                    <span>{actividad.hora}</span>
-                    <button className="text-gray-300 hover:text-nova-blue p-1 rounded-full hover:bg-nova-bg transition-colors">
-                      <ChevronRight size={18} />
-                    </button>
+                  <div className={`flex items-center gap-2 text-xs flex-shrink-0 ${d('text-nova-slate', 'text-gray-500')}`}>
+                    <span>{formatHora(actividad.fecha_actividad)}</span>
+                    <ChevronRight size={18} className={d('text-gray-300', 'text-gray-600')} />
                   </div>
                 </div>
               );
