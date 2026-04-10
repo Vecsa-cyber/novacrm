@@ -27,7 +27,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
       {/* ── Card de login — centrado en móvil, derecha en desktop ── */}
       <div className="relative z-10 min-h-screen flex items-center justify-center px-4 md:justify-end md:px-0 md:pr-14 lg:pr-20">
-        <div className="w-full max-w-sm bg-white/40 backdrop-blur-sm rounded-3xl shadow-2xl p-6 sm:p-8 my-6 sm:my-8">
+        <div className="w-full max-w-sm bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl p-6 sm:p-8 my-6 sm:my-8">
 
           {/* Logo */}
           <div className="flex flex-col items-center mb-7">
