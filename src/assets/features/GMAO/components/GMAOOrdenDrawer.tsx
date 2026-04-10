@@ -1,12 +1,13 @@
 import React from 'react';
-import { X, ClipboardList, AlertCircle } from 'lucide-react';
-import { TIPOS_MANT, PRIORIDADES, ESTADOS_OT } from '../hooks/useGMAOOrdenes';
-import type { OrdenForm } from '../hooks/useGMAOOrdenes';
+import { X, ClipboardList, AlertCircle, RefreshCw, Calendar } from 'lucide-react';
+import { TIPOS_MANT, PRIORIDADES, ESTADOS_OT, PERIODICIDADES } from '../hooks/useGMAOOrdenes';
+import type { OrdenForm, CatalogoActividad } from '../hooks/useGMAOOrdenes';
 
 interface Props {
   form: OrdenForm;
   activos:  { id_activo: number; nombre_activo: string; tag_activo: string }[];
   usuarios: { id_usuario: number; nombre: string }[];
+  catalogo: CatalogoActividad[];
   onField:  (k: keyof OrdenForm, v: string) => void;
   onSubmit: () => void;
   onClose:  () => void;
@@ -17,13 +18,20 @@ interface Props {
 }
 
 export const GMAOOrdenDrawer: React.FC<Props> = ({
-  form, activos, usuarios, onField, onSubmit, onClose,
+  form, activos, usuarios, catalogo, onField, onSubmit, onClose,
   saving = false, error = null, darkMode = false, title = 'Nueva Orden de Trabajo',
 }) => {
   const d = (light: string, dark: string) => darkMode ? dark : light;
   const inputCls = `w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-orange-400/20 transition-colors ${d('border-gray-200 text-gray-800 bg-white', 'border-gray-600 text-gray-100 bg-gray-700')}`;
   const labelCls = `text-xs font-bold mb-1 block ${d('text-gray-500', 'text-gray-400')}`;
   const sectionCls = `text-[10px] font-black uppercase tracking-wider mb-3 ${d('text-slate-400', 'text-gray-500')}`;
+
+  const isPreventivo = form.tipo_mantenimiento === 'Preventivo';
+
+  // Filtra catálogo según el tipo seleccionado (muestra todos si no es preventivo)
+  const catalogoFiltrado = catalogo.filter(c =>
+    !c.tipo_mantenimiento || c.tipo_mantenimiento === form.tipo_mantenimiento
+  );
 
   return (
     <>
@@ -94,6 +102,85 @@ export const GMAOOrdenDrawer: React.FC<Props> = ({
             </div>
           </div>
 
+          {/* ── PERIODICIDAD (solo Preventivo) ── */}
+          {isPreventivo && (
+            <div className={`rounded-xl p-4 border ${d('bg-blue-50/60 border-blue-100', 'bg-blue-900/10 border-blue-800/30')}`}>
+              <div className="flex items-center gap-2 mb-3">
+                <RefreshCw size={14} className={d('text-blue-500', 'text-blue-400')} />
+                <p className={`text-[10px] font-black uppercase tracking-wider ${d('text-blue-500', 'text-blue-400')}`}>Periodicidad</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className={form.periodicidad === '0' ? '' : 'col-span-2'}>
+                  <label className={labelCls}>Frecuencia <span className="text-red-400">*</span></label>
+                  <select value={form.periodicidad} onChange={e => onField('periodicidad', e.target.value)} className={inputCls}>
+                    <option value="">Seleccionar...</option>
+                    {PERIODICIDADES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                  </select>
+                </div>
+                {form.periodicidad === '0' && (
+                  <div>
+                    <label className={labelCls}>Días personalizados</label>
+                    <input
+                      type="number" min="1" max="3650"
+                      value={form.periodicidad_custom}
+                      onChange={e => onField('periodicidad_custom', e.target.value)}
+                      placeholder="Ej: 45"
+                      className={inputCls}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── FECHA PROGRAMADA (Correctivo / Predictivo) ── */}
+          {!isPreventivo && (
+            <div>
+              <p className={sectionCls}>Fechas</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>
+                    <span className="flex items-center gap-1">
+                      <Calendar size={11} /> Fecha programada
+                    </span>
+                  </label>
+                  <input type="datetime-local" value={form.fecha_programada}
+                    onChange={e => onField('fecha_programada', e.target.value)} className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>Fecha cierre</label>
+                  <input type="date" value={form.fecha_cierre}
+                    onChange={e => onField('fecha_cierre', e.target.value)} className={inputCls} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── FECHA CIERRE para Preventivo (sin fecha programada) ── */}
+          {isPreventivo && (
+            <div>
+              <label className={labelCls}>Fecha cierre</label>
+              <input type="date" value={form.fecha_cierre}
+                onChange={e => onField('fecha_cierre', e.target.value)} className={inputCls} />
+            </div>
+          )}
+
+          {/* Catálogo de actividades */}
+          <div>
+            <p className={sectionCls}>Actividad del catálogo</p>
+            <select value={form.id_actividad} onChange={e => onField('id_actividad', e.target.value)} className={inputCls}>
+              <option value="">Sin actividad asignada</option>
+              {catalogoFiltrado.map(c => (
+                <option key={c.id_actividad} value={c.id_actividad}>{c.nombre}</option>
+              ))}
+            </select>
+            {catalogoFiltrado.length === 0 && (
+              <p className={`text-xs mt-1 ${d('text-gray-400','text-gray-500')}`}>
+                No hay actividades en el catálogo para este tipo. Puedes agregar desde configuración.
+              </p>
+            )}
+          </div>
+
           {/* Personal */}
           <div>
             <p className={sectionCls}>Personal asignado</p>
@@ -111,23 +198,6 @@ export const GMAOOrdenDrawer: React.FC<Props> = ({
                   <option value="">Sin asignar</option>
                   {usuarios.map(u => <option key={u.id_usuario} value={u.id_usuario}>{u.nombre}</option>)}
                 </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Fechas */}
-          <div>
-            <p className={sectionCls}>Fechas</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={labelCls}>Fecha programada</label>
-                <input type="datetime-local" value={form.fecha_programada}
-                  onChange={e => onField('fecha_programada', e.target.value)} className={inputCls} />
-              </div>
-              <div>
-                <label className={labelCls}>Fecha cierre</label>
-                <input type="date" value={form.fecha_cierre}
-                  onChange={e => onField('fecha_cierre', e.target.value)} className={inputCls} />
               </div>
             </div>
           </div>

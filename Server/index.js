@@ -1026,13 +1026,15 @@ app.get('/api/gmao/ordenes', async (_req, res) => {
               c.nombre_fiscal AS nombre_cliente,
               p.nombre_planta,
               ut.nombre AS nombre_tecnico,
-              us.nombre AS nombre_supervisor
+              us.nombre AS nombre_supervisor,
+              ca.nombre AS nombre_actividad
        FROM gmao_ordenes_trabajo ot
-       LEFT JOIN gmao_activos         a  ON ot.id_activo    = a.id_activo
-       LEFT JOIN plantas              p  ON a.id_planta     = p.id_planta
-       LEFT JOIN gmao_clientes        c  ON p.id_planta     = c.id_planta
-       LEFT JOIN usuarios             ut ON ot.id_tecnico   = ut.id_usuario
-       LEFT JOIN usuarios             us ON ot.id_supervisor= us.id_usuario
+       LEFT JOIN gmao_activos              a  ON ot.id_activo    = a.id_activo
+       LEFT JOIN plantas                   p  ON a.id_planta     = p.id_planta
+       LEFT JOIN gmao_clientes             c  ON p.id_planta     = c.id_planta
+       LEFT JOIN usuarios                  ut ON ot.id_tecnico   = ut.id_usuario
+       LEFT JOIN usuarios                  us ON ot.id_supervisor= us.id_usuario
+       LEFT JOIN gmao_catalogo_actividades ca ON ot.id_actividad = ca.id_actividad
        ORDER BY ot.fecha_programada ASC`
     );
     res.json(rows);
@@ -1047,13 +1049,15 @@ app.get('/api/gmao/ordenes/:id', async (req, res) => {
               c.nombre_fiscal AS nombre_cliente,
               p.nombre_planta,
               ut.nombre AS nombre_tecnico,
-              us.nombre AS nombre_supervisor
+              us.nombre AS nombre_supervisor,
+              ca.nombre AS nombre_actividad
        FROM gmao_ordenes_trabajo ot
-       LEFT JOIN gmao_activos         a  ON ot.id_activo    = a.id_activo
-       LEFT JOIN plantas              p  ON a.id_planta     = p.id_planta
-       LEFT JOIN gmao_clientes        c  ON p.id_planta     = c.id_planta
-       LEFT JOIN usuarios             ut ON ot.id_tecnico   = ut.id_usuario
-       LEFT JOIN usuarios             us ON ot.id_supervisor= us.id_usuario
+       LEFT JOIN gmao_activos              a  ON ot.id_activo    = a.id_activo
+       LEFT JOIN plantas                   p  ON a.id_planta     = p.id_planta
+       LEFT JOIN gmao_clientes             c  ON p.id_planta     = c.id_planta
+       LEFT JOIN usuarios                  ut ON ot.id_tecnico   = ut.id_usuario
+       LEFT JOIN usuarios                  us ON ot.id_supervisor= us.id_usuario
+       LEFT JOIN gmao_catalogo_actividades ca ON ot.id_actividad = ca.id_actividad
        WHERE ot.id_ot = ?`,
       [req.params.id]
     );
@@ -1064,10 +1068,19 @@ app.get('/api/gmao/ordenes/:id', async (req, res) => {
 
 app.post('/api/gmao/ordenes', async (req, res) => {
   try {
-    const { folio, id_activo, tipo_mantenimiento, prioridad, estado_ot, id_tecnico, id_supervisor, fecha_programada, fecha_cierre, descripcion_falla, acciones_realizadas } = req.body;
+    const { folio, id_activo, tipo_mantenimiento, prioridad, estado_ot, id_tecnico, id_supervisor,
+            fecha_programada, fecha_cierre, descripcion_falla, acciones_realizadas,
+            periodicidad, periodicidad_custom, id_actividad } = req.body;
     const [result] = await pool.query(
-      'INSERT INTO gmao_ordenes_trabajo (folio, id_activo, tipo_mantenimiento, prioridad, estado_ot, id_tecnico, id_supervisor, fecha_programada, fecha_cierre, descripcion_falla, acciones_realizadas) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [folio ?? null, id_activo ?? null, tipo_mantenimiento, prioridad ?? 'Media', estado_ot ?? 'Abierta', id_tecnico ?? null, id_supervisor ?? null, fecha_programada ?? null, fecha_cierre ?? null, descripcion_falla ?? null, acciones_realizadas ?? null]
+      `INSERT INTO gmao_ordenes_trabajo
+         (folio, id_activo, tipo_mantenimiento, prioridad, estado_ot, id_tecnico, id_supervisor,
+          fecha_programada, fecha_cierre, descripcion_falla, acciones_realizadas,
+          periodicidad, periodicidad_custom, id_actividad)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [folio ?? null, id_activo ?? null, tipo_mantenimiento, prioridad ?? 'Media', estado_ot ?? 'Abierta',
+       id_tecnico ?? null, id_supervisor ?? null, fecha_programada ?? null, fecha_cierre ?? null,
+       descripcion_falla ?? null, acciones_realizadas ?? null,
+       periodicidad ?? null, periodicidad_custom ?? null, id_actividad ?? null]
     );
     res.status(201).json({ id_ot: result.insertId });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -1075,10 +1088,21 @@ app.post('/api/gmao/ordenes', async (req, res) => {
 
 app.put('/api/gmao/ordenes/:id', async (req, res) => {
   try {
-    const { folio, id_activo, tipo_mantenimiento, prioridad, estado_ot, id_tecnico, id_supervisor, fecha_programada, fecha_cierre, descripcion_falla, acciones_realizadas } = req.body;
+    const { folio, id_activo, tipo_mantenimiento, prioridad, estado_ot, id_tecnico, id_supervisor,
+            fecha_programada, fecha_cierre, descripcion_falla, acciones_realizadas,
+            periodicidad, periodicidad_custom, id_actividad } = req.body;
     await pool.query(
-      'UPDATE gmao_ordenes_trabajo SET folio=?, id_activo=?, tipo_mantenimiento=?, prioridad=?, estado_ot=?, id_tecnico=?, id_supervisor=?, fecha_programada=?, fecha_cierre=?, descripcion_falla=?, acciones_realizadas=? WHERE id_ot=?',
-      [folio ?? null, id_activo ?? null, tipo_mantenimiento, prioridad ?? 'Media', estado_ot ?? 'Abierta', id_tecnico ?? null, id_supervisor ?? null, fecha_programada ?? null, fecha_cierre ?? null, descripcion_falla ?? null, acciones_realizadas ?? null, req.params.id]
+      `UPDATE gmao_ordenes_trabajo SET
+         folio=?, id_activo=?, tipo_mantenimiento=?, prioridad=?, estado_ot=?,
+         id_tecnico=?, id_supervisor=?, fecha_programada=?, fecha_cierre=?,
+         descripcion_falla=?, acciones_realizadas=?,
+         periodicidad=?, periodicidad_custom=?, id_actividad=?
+       WHERE id_ot=?`,
+      [folio ?? null, id_activo ?? null, tipo_mantenimiento, prioridad ?? 'Media', estado_ot ?? 'Abierta',
+       id_tecnico ?? null, id_supervisor ?? null, fecha_programada ?? null, fecha_cierre ?? null,
+       descripcion_falla ?? null, acciones_realizadas ?? null,
+       periodicidad ?? null, periodicidad_custom ?? null, id_actividad ?? null,
+       req.params.id]
     );
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -1115,7 +1139,60 @@ app.get('/api/gmao/dashboard', async (_req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ── GMAO — CATÁLOGO DE ACTIVIDADES ───────────────────────────
+app.get('/api/gmao/catalogo', async (_req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT * FROM gmao_catalogo_actividades WHERE activo = 1 ORDER BY nombre ASC`
+    );
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/gmao/catalogo', async (req, res) => {
+  try {
+    const { nombre, tipo_mantenimiento, descripcion } = req.body;
+    if (!nombre) return res.status(400).json({ error: 'El nombre es requerido' });
+    const [result] = await pool.query(
+      'INSERT INTO gmao_catalogo_actividades (nombre, tipo_mantenimiento, descripcion) VALUES (?, ?, ?)',
+      [nombre, tipo_mantenimiento ?? null, descripcion ?? null]
+    );
+    res.status(201).json({ id_actividad: result.insertId });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/gmao/catalogo/:id', async (req, res) => {
+  try {
+    await pool.query('UPDATE gmao_catalogo_actividades SET activo = 0 WHERE id_actividad = ?', [req.params.id]);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ── Inicio ────────────────────────────────────────────────────
-app.listen(PORT, () => {
+const runMigrations = async () => {
+  try {
+    await pool.query(`
+      ALTER TABLE gmao_ordenes_trabajo
+        ADD COLUMN IF NOT EXISTS periodicidad       INT NULL COMMENT 'Días entre ejecuciones preventivas',
+        ADD COLUMN IF NOT EXISTS periodicidad_custom INT NULL COMMENT 'Días personalizados',
+        ADD COLUMN IF NOT EXISTS id_actividad       INT NULL
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS gmao_catalogo_actividades (
+        id_actividad       INT AUTO_INCREMENT PRIMARY KEY,
+        nombre             VARCHAR(200) NOT NULL,
+        tipo_mantenimiento ENUM('Preventivo','Correctivo','Predictivo') DEFAULT NULL,
+        descripcion        TEXT,
+        activo             TINYINT(1) DEFAULT 1
+      )
+    `);
+    console.log('✅ Migraciones GMAO aplicadas');
+  } catch (err) {
+    console.warn('⚠️  Migraciones GMAO:', err.message);
+  }
+};
+
+app.listen(PORT, async () => {
+  await runMigrations();
   console.log(`✅ API corriendo en http://localhost:${PORT}`);
 });

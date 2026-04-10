@@ -20,6 +20,17 @@ export interface GMAOOrden {
   acciones_realizadas: string;
   nombre_cliente: string;
   nombre_planta: string;
+  periodicidad: number | null;
+  periodicidad_custom: number | null;
+  id_actividad: number | null;
+  nombre_actividad: string;
+}
+
+export interface CatalogoActividad {
+  id_actividad: number;
+  nombre: string;
+  tipo_mantenimiento: string | null;
+  descripcion: string | null;
 }
 
 export interface OrdenForm {
@@ -34,6 +45,9 @@ export interface OrdenForm {
   fecha_cierre: string;
   descripcion_falla: string;
   acciones_realizadas: string;
+  periodicidad: string;
+  periodicidad_custom: string;
+  id_actividad: string;
 }
 
 const EMPTY_FORM: OrdenForm = {
@@ -42,11 +56,22 @@ const EMPTY_FORM: OrdenForm = {
   id_tecnico: '', id_supervisor: '',
   fecha_programada: '', fecha_cierre: '',
   descripcion_falla: '', acciones_realizadas: '',
+  periodicidad: '', periodicidad_custom: '', id_actividad: '',
 };
 
 export const TIPOS_MANT  = ['Preventivo', 'Correctivo', 'Predictivo'] as const;
 export const PRIORIDADES = ['Baja', 'Media', 'Alta', 'Crítica'] as const;
 export const ESTADOS_OT  = ['Abierta', 'En Proceso', 'Pendiente Repuestos', 'Cerrada'] as const;
+export const PERIODICIDADES = [
+  { value: '7',   label: 'Semanal (7 días)' },
+  { value: '15',  label: 'Quincenal (15 días)' },
+  { value: '30',  label: 'Mensual (30 días)' },
+  { value: '60',  label: 'Bimestral (60 días)' },
+  { value: '90',  label: 'Trimestral (90 días)' },
+  { value: '180', label: 'Semestral (180 días)' },
+  { value: '365', label: 'Anual (365 días)' },
+  { value: '0',   label: 'Personalizado' },
+] as const;
 
 // Auto-genera folio OT-YYYY-XXXXXX
 const genFolio = () => {
@@ -63,16 +88,22 @@ const buildBody = (f: OrdenForm) => ({
   estado_ot:           f.estado_ot,
   id_tecnico:          f.id_tecnico                ? Number(f.id_tecnico)   : null,
   id_supervisor:       f.id_supervisor             ? Number(f.id_supervisor): null,
-  fecha_programada:    f.fecha_programada          || null,
+  fecha_programada:    f.tipo_mantenimiento === 'Preventivo' ? null : (f.fecha_programada || null),
   fecha_cierre:        f.fecha_cierre              || null,
   descripcion_falla:   f.descripcion_falla.trim()  || null,
   acciones_realizadas: f.acciones_realizadas.trim()|| null,
+  periodicidad:        f.tipo_mantenimiento === 'Preventivo' && f.periodicidad && f.periodicidad !== '0'
+                         ? Number(f.periodicidad) : null,
+  periodicidad_custom: f.tipo_mantenimiento === 'Preventivo' && f.periodicidad === '0' && f.periodicidad_custom
+                         ? Number(f.periodicidad_custom) : null,
+  id_actividad:        f.id_actividad              ? Number(f.id_actividad) : null,
 });
 
 export const useGMAOOrdenes = () => {
   const [ordenes,   setOrdenes]   = useState<GMAOOrden[]>([]);
   const [activos,   setActivos]   = useState<{ id_activo: number; nombre_activo: string; tag_activo: string }[]>([]);
   const [usuarios,  setUsuarios]  = useState<{ id_usuario: number; nombre: string }[]>([]);
+  const [catalogo,  setCatalogo]  = useState<CatalogoActividad[]>([]);
   const [loading,   setLoading]   = useState(true);
   const [saving,    setSaving]    = useState(false);
   const [error,     setError]     = useState<string | null>(null);
@@ -106,6 +137,7 @@ export const useGMAOOrdenes = () => {
     recargar();
     apiFetch('/api/gmao/activos').then(r => r.json()).then(setActivos).catch(() => {});
     apiFetch('/api/usuarios/todos').then(r => r.json()).then(setUsuarios).catch(() => {});
+    apiFetch('/api/gmao/catalogo').then(r => r.json()).then(setCatalogo).catch(() => {});
   }, []);
 
   const filtered = ordenes.filter(o => {
@@ -123,17 +155,21 @@ export const useGMAOOrdenes = () => {
 
   // ── Export a CSV (sin deps externas) ────────────────────────────────────────
   const exportExcel = () => {
-    const cols = ['Folio','Activo','TAG','Cliente','Planta','Tipo','Prioridad','Estado',
-                  'Técnico','Supervisor','Fecha Programada','Fecha Cierre','Descripción','Acciones'];
-    const rows = filtered.map(o => [
-      o.folio, o.nombre_activo, o.tag_activo, o.nombre_cliente, o.nombre_planta,
-      o.tipo_mantenimiento, o.prioridad, o.estado_ot,
-      o.nombre_tecnico, o.nombre_supervisor,
-      o.fecha_programada?.slice(0,10) ?? '',
-      o.fecha_cierre?.slice(0,10)     ?? '',
-      o.descripcion_falla             ?? '',
-      o.acciones_realizadas           ?? '',
-    ]);
+    const cols = ['Folio','Activo','TAG','Cliente','Planta','Tipo','Periodicidad (días)','Prioridad','Estado',
+                  'Técnico','Supervisor','Fecha Programada','Fecha Cierre','Descripción','Acciones','Actividad'];
+    const rows = filtered.map(o => {
+      const per = o.periodicidad ?? o.periodicidad_custom ?? '';
+      return [
+        o.folio, o.nombre_activo, o.tag_activo, o.nombre_cliente, o.nombre_planta,
+        o.tipo_mantenimiento, per, o.prioridad, o.estado_ot,
+        o.nombre_tecnico, o.nombre_supervisor,
+        o.fecha_programada?.slice(0,10) ?? '',
+        o.fecha_cierre?.slice(0,10)     ?? '',
+        o.descripcion_falla             ?? '',
+        o.acciones_realizadas           ?? '',
+        o.nombre_actividad              ?? '',
+      ];
+    });
     const csv = [cols, ...rows]
       .map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(','))
       .join('\n');
@@ -174,6 +210,9 @@ export const useGMAOOrdenes = () => {
       fecha_cierre:        o.fecha_cierre         ? o.fecha_cierre.slice(0,10)     : '',
       descripcion_falla:   o.descripcion_falla    ?? '',
       acciones_realizadas: o.acciones_realizadas  ?? '',
+      periodicidad:        o.periodicidad         ? String(o.periodicidad) : '',
+      periodicidad_custom: o.periodicidad_custom  ? String(o.periodicidad_custom) : '',
+      id_actividad:        o.id_actividad         ? String(o.id_actividad) : '',
     });
   };
 
@@ -204,7 +243,7 @@ export const useGMAOOrdenes = () => {
   };
 
   return {
-    filtered, activos, usuarios, loading, saving, error, setError,
+    filtered, activos, usuarios, catalogo, loading, saving, error, setError,
     search, setSearch, filtroEstado, setFiltroEstado, filtroPrior, setFiltroPrior,
     drawerOpen, setDrawerOpen, form, setField, submitNuevo,
     editingId, editDraft, setEditField, startEdit, submitEdit, cancelEdit: () => setEditingId(null),

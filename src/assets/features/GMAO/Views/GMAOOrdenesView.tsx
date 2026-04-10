@@ -76,7 +76,7 @@ export const GMAOOrdenesView: React.FC<GMAOProps> = ({ darkMode = false }) => {
       {/* ── DRAWER NUEVA OT ── */}
       {o.drawerOpen && (
         <GMAOOrdenDrawer
-          form={o.form} activos={o.activos} usuarios={o.usuarios}
+          form={o.form} activos={o.activos} usuarios={o.usuarios} catalogo={o.catalogo}
           onField={o.setField} onSubmit={o.submitNuevo}
           onClose={() => { o.setDrawerOpen(false); o.setError(null); }}
           saving={o.saving} error={o.error} darkMode={darkMode}
